@@ -33,16 +33,23 @@ def guardar_certificado():
     if not datos:
         return jsonify({"status": "error", "mensaje": "JSON no recibido correctamente"}), 400
 
+    folio = datos.get('folio', '')
+    if not folio:
+        return jsonify({"status": "error", "mensaje": "Folio es requerido"}), 400
+
     try:
         conn = sqlite3.connect('certificados.db')
         c = conn.cursor()
         
-        # INSERT OR REPLACE evita que el flujo se rompa si el folio ya existe
+        # Elimina el registro anterior si existe para evitar conflictos de reemplazo
+        c.execute('DELETE FROM certificados WHERE folio = ?', (folio,))
+        
+        # Inserta el nuevo registro limpio
         c.execute('''
-            INSERT OR REPLACE INTO certificados (folio, nombre, curp, curso, fecha, calificacion, empresa, rfc_empresa)
+            INSERT INTO certificados (folio, nombre, curp, curso, fecha, calificacion, empresa, rfc_empresa)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            datos.get('folio', ''),
+            folio,
             datos.get('nombre', ''),
             datos.get('curp', ''),
             datos.get('curso', ''),
