@@ -1,11 +1,19 @@
+import os
 from flask import Flask, request, render_template, jsonify
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 
+# Conexión a tu base de datos en la nube
+DB_URL = "postgresql://postgres:AsherEx3:14Asher@db.fvtibuitvbiuqygpallg.supabase.co:5432/postgres"
+
+def get_db_connection():
+    return psycopg2.connect(DB_URL)
+
 # 1. Crear la base de datos
 def init_db():
-    conn = sqlite3.connect('certificados.db')
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS certificados (
@@ -20,14 +28,15 @@ def init_db():
         )
     ''')
     conn.commit()
+    c.close()
     conn.close()
 
-# Forzar la creación de la base de datos al arrancar Gunicorn
+# Forzar la creación de la tabla al arrancar
 init_db()
 
 @app.route('/')
 def home():
-    return "El sistema de validación de DC-3 está activo."
+    return "El sistema de validación de DC-3 está activo y en la nube."
 
 @app.route('/api/guardar', methods=['POST'])
 def guardar_certificado():
@@ -40,12 +49,12 @@ def guardar_certificado():
         return jsonify({"status": "error", "mensaje": "Folio requerido"}), 400
 
     try:
-        conn = sqlite3.connect('certificados.db')
+        conn = get_db_connection()
         c = conn.cursor()
-        c.execute('DELETE FROM certificados WHERE folio = ?', (folio,))
+        c.execute('DELETE FROM certificados WHERE folio = %s', (folio,))
         c.execute('''
             INSERT INTO certificados (folio, nombre, curp, curso, fecha, calificacion, empresa, rfc_empresa)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             folio, datos.get('nombre', ''), datos.get('curp', ''), 
             datos.get('curso', ''), datos.get('fecha', ''), 
@@ -53,6 +62,7 @@ def guardar_certificado():
             datos.get('rfc_empresa', '')
         ))
         conn.commit()
+        c.close()
         conn.close()
         return jsonify({"status": "éxito", "mensaje": "Guardado"}), 201
     except Exception as e:
@@ -60,11 +70,11 @@ def guardar_certificado():
 
 @app.route('/validar/<folio>')
 def validar(folio):
-    conn = sqlite3.connect('certificados.db')
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM certificados WHERE folio = ?', (folio,))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute('SELECT * FROM certificados WHERE folio = %s', (folio,))
     certificado = c.fetchone()
+    c.close()
     conn.close()
 
     if certificado:
