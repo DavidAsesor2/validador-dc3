@@ -3,7 +3,7 @@ import sqlite3
 
 app = Flask(__name__)
 
-# 1. Función para crear nuestra base de datos de certificados
+# Función para crear la base de datos
 def init_db():
     conn = sqlite3.connect('certificados.db')
     c = conn.cursor()
@@ -26,28 +26,38 @@ def init_db():
 def home():
     return "El sistema de validación de DC-3 está activo."
 
-# 2. Esta es la "puerta" por donde Power Automate mandará los datos
+# Ruta receptora de Power Automate
 @app.route('/api/guardar', methods=['POST'])
 def guardar_certificado():
-    datos = request.json
+    datos = request.get_json(silent=True)
+    if not datos:
+        return jsonify({"status": "error", "mensaje": "JSON no recibido correctamente"}), 400
+
     try:
         conn = sqlite3.connect('certificados.db')
         c = conn.cursor()
+        
+        # INSERT OR REPLACE evita que el flujo se rompa si el folio ya existe
         c.execute('''
-            INSERT INTO certificados (folio, nombre, curp, curso, fecha, calificacion, empresa, rfc_empresa)
+            INSERT OR REPLACE INTO certificados (folio, nombre, curp, curso, fecha, calificacion, empresa, rfc_empresa)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            datos['folio'], datos['nombre'], datos['curp'], 
-            datos['curso'], datos['fecha'], datos['calificacion'], 
-            datos['empresa'], datos['rfc_empresa']
+            datos.get('folio', ''),
+            datos.get('nombre', ''),
+            datos.get('curp', ''),
+            datos.get('curso', ''),
+            datos.get('fecha', ''),
+            datos.get('calificacion', ''),
+            datos.get('empresa', ''),
+            datos.get('rfc_empresa', '')
         ))
         conn.commit()
         conn.close()
         return jsonify({"status": "éxito", "mensaje": "Datos guardados correctamente"}), 201
     except Exception as e:
-        return jsonify({"status": "error", "mensaje": "El folio ya existe o hubo un error"}), 400
+        return jsonify({"status": "error", "mensaje": str(e)}), 500
 
-# 3. Esta es la página que se abre cuando escanean el QR
+# Ruta visual del código QR
 @app.route('/validar/<folio>')
 def validar(folio):
     conn = sqlite3.connect('certificados.db')
@@ -58,10 +68,8 @@ def validar(folio):
     conn.close()
 
     if certificado:
-        # Si encuentra el folio, muestra el diseño bonito
         return render_template('certificado.html', data=certificado)
     else:
-        # Si escanean un QR falso
         return "<h1 style='color:red; text-align:center; font-family:sans-serif; margin-top:50px;'>Documento NO válido o no encontrado</h1>", 404
 
 if __name__ == '__main__':
