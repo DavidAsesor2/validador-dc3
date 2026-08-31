@@ -6,7 +6,7 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 # Conexión a tu base de datos en la nube
-DB_URL = "postgresql://postgres:AsherEx3:14Asher@db.fvtibuitvbiuqygpallg.supabase.co:5432/postgres"
+DB_URL = "postgresql://postgres.fvtibuitvbiuqygpallg:[AsherEx3:14Asher]@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
 
 def get_db_connection():
     return psycopg2.connect(DB_URL)
